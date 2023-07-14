@@ -24,7 +24,7 @@ func (app *application) addIPToContext(next http.Handler) http.Handler {
 		if err != nil {
 			ip, _, _ = net.SplitHostPort(r.RemoteAddr)
 			if len(ip) == 0 {
-				ip = "unknown"
+				ip = "1.1.1.1"
 			}
 		}
 		ctx = context.WithValue(r.Context(), contextUserKey, ip)
