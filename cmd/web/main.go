@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/alexedwards/scs/v2"
 )
 
 type application struct {
+	Session *scs.SessionManager
 }
 
 func main() {
@@ -14,6 +17,9 @@ func main() {
 	port := 8080
 	// set up an app config
 	app := application{}
+
+	// get a session manager
+	app.Session = getSession()
 
 	// get application route
 	mux := app.routes()

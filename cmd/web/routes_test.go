@@ -18,7 +18,6 @@ func Test_application_routes(t *testing.T) {
 		{"/login", "POST"},
 	}
 
-	var app application
 	mux := app.routes()
 
 	chiRoutes := mux.(chi.Routes)
