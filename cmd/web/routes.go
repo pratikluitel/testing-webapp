@@ -19,6 +19,7 @@ func (app *application) routes() http.Handler {
 
 	// register routes
 	mux.Get("/", app.Home)
+	mux.Get("/user/profile", app.Profile)
 	mux.Post("/login", app.Login)
 
 	// static assets

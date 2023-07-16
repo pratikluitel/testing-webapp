@@ -101,7 +101,7 @@ func Test_application_Home(t *testing.T) {
 
 func Test_application_renderWithBadTemplate(t *testing.T) {
 	// set template path to a location with a bad template
-	pathToTemplates = "./testdata"
+	pathToTemplates = "./testdata/"
 
 	req, _ := http.NewRequest("GET", "/", nil)
 	req = addContextAndSessionToRequest(req, app)
@@ -112,6 +112,8 @@ func Test_application_renderWithBadTemplate(t *testing.T) {
 	if err == nil {
 		t.Error("Expected an error from bad template, but did not get error")
 	}
+
+	pathToTemplates = "./../../templates/"
 }
 
 func getCtx(req *http.Request) context.Context {
