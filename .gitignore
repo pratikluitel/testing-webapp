@@ -1,2 +1,4 @@
 *.out
 static
+postgres-data
+pgadmin-data
