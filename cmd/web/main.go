@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/gob"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"webapp/pkg/data"
 	"webapp/pkg/db"
 
 	"github.com/alexedwards/scs/v2"
@@ -17,6 +19,8 @@ type application struct {
 }
 
 func main() {
+
+	gob.Register(data.User{})
 
 	port := 9000
 	// set up an app config
