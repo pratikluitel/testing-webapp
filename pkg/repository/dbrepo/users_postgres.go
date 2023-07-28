@@ -61,9 +61,12 @@ func (m *PostgresDBRepo) GetUser(id int) (*data.User, error) {
 	defer cancel()
 
 	query := `SELECT 
-				id, email, first_name, last_name, password, is_admin, created_at, updated_at
-			  from users
-			  where id = $1`
+				u.id, u.email, u.first_name, u.last_name, u.password, u.is_admin, u.created_at, u.updated_at,
+				coalesce(ui.file_name, '')
+			  from users u
+			  left join user_images ui
+			  on ui.user_id = u.id
+			  where u.id = $1`
 	var user data.User
 
 	row := m.DB.QueryRowContext(ctx, query, id)
@@ -77,7 +80,9 @@ func (m *PostgresDBRepo) GetUser(id int) (*data.User, error) {
 		&user.IsAdmin,
 		&user.CreatedAt,
 		&user.UpdatedAt,
+		&user.ProfilePic.FileName,
 	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -89,9 +94,12 @@ func (m *PostgresDBRepo) GetUserByEmail(email string) (*data.User, error) {
 	defer cancel()
 
 	query := `SELECT 
-				id, email, first_name, last_name, password, is_admin, created_at, updated_at
-			  from users
-			  where email = $1`
+				u.id, u.email, u.first_name, u.last_name, u.password, u.is_admin, u.created_at, u.updated_at,
+				coalesce(ui.file_name, '')
+			  from users u
+			  left join user_images ui
+			  on ui.user_id = u.id
+			  where u.email = $1`
 	var user data.User
 
 	row := m.DB.QueryRowContext(ctx, query, email)
@@ -105,6 +113,7 @@ func (m *PostgresDBRepo) GetUserByEmail(email string) (*data.User, error) {
 		&user.IsAdmin,
 		&user.CreatedAt,
 		&user.UpdatedAt,
+		&user.ProfilePic.FileName,
 	)
 	if err != nil {
 		return nil, err
@@ -212,11 +221,18 @@ func (m *PostgresDBRepo) InsertUserImage(i data.UserImage) (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
+	// delete existing user image just in case
+	stmt := `delete from user_images where user_id = $1`
+	_, err := m.DB.ExecContext(ctx, stmt, i.UserID)
+	if err != nil {
+		return 0, err
+	}
+
 	var newID int
-	stmt := `insert into user_images (user_id, file_name, created_at, updated_at)
+	stmt = `insert into user_images (user_id, file_name, created_at, updated_at)
 		values ($1, $2, $3, $4) returning id`
 
-	err := m.DB.QueryRowContext(ctx, stmt,
+	err = m.DB.QueryRowContext(ctx, stmt,
 		i.UserID,
 		i.FileName,
 		time.Now(),

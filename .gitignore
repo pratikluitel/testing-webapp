@@ -1,4 +1,6 @@
 *.out
+*.png
+*.jpg
 static
 _postgres-data
 _pgadmin-data

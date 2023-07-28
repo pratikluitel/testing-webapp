@@ -3,11 +3,19 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"image"
+	"image/jpeg"
+
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -220,5 +228,70 @@ func Test_application_Login(t *testing.T) {
 		} else {
 			t.Errorf("%s: No location header ser", e.name)
 		}
+	}
+}
+
+func Test_application_UploadFiles(t *testing.T) {
+	// set up pipes
+	pr, pw := io.Pipe() // dummy reader and writer
+
+	// create new writer of type *io.Writer
+	writer := multipart.NewWriter(pw)
+
+	// simulate uploading file using goroutine and writer, concurrent
+	// start a go routine that runs concurrent with current request
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	go simulatePNGUpload("./testdata/test.jpg", writer, t, wg)
+
+	// read from pipe, which will recieve data
+	request := httptest.NewRequest("POST", "/", pr)
+	request.Header.Add("Content-Type", writer.FormDataContentType())
+
+	// call app.UploadFiles
+	uploadedFiles, err := app.UploadFiles(request, "./testdata/uploads/")
+	if err != nil {
+		t.Error(err)
+	}
+	// perform tests
+	// check to see uploaded file exists, error if not
+	if _, err := os.Stat(fmt.Sprintf("./testdata/uploads/%s", uploadedFiles[0].OriginalFileName)); os.IsNotExist(err) {
+		t.Errorf("expected file to exist: %s", err.Error())
+	}
+
+	// clean up
+	_ = os.Remove(fmt.Sprintf("./testdata/uploads/%s", uploadedFiles[0].OriginalFileName))
+}
+
+func simulatePNGUpload(fileToUpload string, writer *multipart.Writer, t *testing.T, wg *sync.WaitGroup) {
+	defer writer.Close()
+	defer wg.Done()
+
+	// create the form data field `file`, with value fileName
+
+	part, err := writer.CreateFormFile("file", path.Base(fileToUpload))
+	if err != nil {
+		t.Error(err)
+	}
+
+	// open the actual file
+	f, err := os.Open(fileToUpload)
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer f.Close()
+
+	// decode the image
+	img, _, err := image.Decode(f)
+	if err != nil {
+		t.Error("Error decoding the image", err)
+	}
+
+	// write the image to io.Writer
+	err = jpeg.Encode(part, img, nil)
+	if err != nil {
+		t.Error(err)
 	}
 }
