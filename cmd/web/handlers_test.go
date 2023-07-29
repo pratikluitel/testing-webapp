@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"image"
 	"image/jpeg"
+	"webapp/pkg/data"
 
 	"io"
 	"mime/multipart"
@@ -243,7 +245,7 @@ func Test_application_UploadFiles(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 
-	go simulatePNGUpload("./testdata/test.jpg", writer, t, wg)
+	go simulateFileUpload("./testdata/test.jpg", writer, t, wg)
 
 	// read from pipe, which will recieve data
 	request := httptest.NewRequest("POST", "/", pr)
@@ -264,7 +266,7 @@ func Test_application_UploadFiles(t *testing.T) {
 	_ = os.Remove(fmt.Sprintf("./testdata/uploads/%s", uploadedFiles[0].OriginalFileName))
 }
 
-func simulatePNGUpload(fileToUpload string, writer *multipart.Writer, t *testing.T, wg *sync.WaitGroup) {
+func simulateFileUpload(fileToUpload string, writer *multipart.Writer, t *testing.T, wg *sync.WaitGroup) {
 	defer writer.Close()
 	defer wg.Done()
 
@@ -294,4 +296,51 @@ func simulatePNGUpload(fileToUpload string, writer *multipart.Writer, t *testing
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+func Test_application_UploadProfilePicture(t *testing.T) {
+	uploadPath = "./testdata/uploads"
+	filePath := "./testdata/test.jpg"
+
+	//specify a field name for the form
+	fieldName := "file"
+
+	//create a bytes Buffer to act as req body
+	body := new(bytes.Buffer)
+
+	//create a new writer
+	mw := multipart.NewWriter(body)
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	w, err := mw.CreateFormFile(fieldName, filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := io.Copy(w, file); err != nil {
+		t.Fatal(err)
+	}
+
+	mw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", body)
+	req = addContextAndSessionToRequest(req, app)
+	app.Session.Put(req.Context(), "user", data.User{ID: 1})
+
+	req.Header.Add("Content-Type", mw.FormDataContentType())
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(app.UploadProfilePicture)
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusSeeOther {
+		t.Errorf("wrong status code")
+	}
+
+	_ = os.Remove("./testdata/uploads/test.jpg")
 }
