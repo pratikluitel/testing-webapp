@@ -11,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-const (
+var (
 	jwtTokenExpiry     = time.Minute * 15
 	refreshTokenExpiry = time.Hour * 24
 )

@@ -12,14 +12,14 @@ func (app *application) routes() http.Handler {
 
 	// register middleware
 	mux.Use(middleware.Recoverer)
-	// mux.Use(app.enableCORS)
+	mux.Use(app.enableCORS)
 
 	// authentication routes - auth handler, refresh tokens
 	mux.Post("/auth", app.authenticate)
 	mux.Post("/refresh-token", app.refresh)
 
 	// test handler
-	mux.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+	mux.Get("/greeting", func(w http.ResponseWriter, r *http.Request) {
 		var payload = struct {
 			Message string `json:"message"`
 		}{
@@ -30,7 +30,9 @@ func (app *application) routes() http.Handler {
 	})
 
 	// protected routes
-	mux.Route("/users", func(r chi.Router) {
+	mux.Route("/users", func(mux chi.Router) {
+		mux.Use(app.authRequired)
+
 		mux.Get("/", app.allUsers)
 		mux.Get("/{userID}", app.getUser)
 		mux.Delete("/{userID}", app.deleteUser)
