@@ -108,7 +108,10 @@ func Test_application_userHandlers(t *testing.T) {
 		{"allUsers", "GET", "", "", app.allUsers, http.StatusOK},
 		{"getUser valid", "GET", "", "1", app.getUser, http.StatusOK},
 		{"getUser invalid", "GET", "", "0", app.getUser, http.StatusBadRequest},
+		{"getUser bad url param", "GET", "", "y", app.getUser, http.StatusBadRequest},
+
 		{"deleteUser", "DELETE", "", "1", app.deleteUser, http.StatusNoContent},
+		{"deleteUser bad url param", "DELETE", "", "y", app.deleteUser, http.StatusBadRequest},
 
 		{
 			"updateUser valid",
