@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -8,6 +9,8 @@ import (
 	"testing"
 	"time"
 	"webapp/pkg/data"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func Test_application_authenticate(t *testing.T) {
@@ -90,4 +93,95 @@ func Test_application_refresh(t *testing.T) {
 		refreshTokenExpiry = oldRefreshTime
 	}
 
+}
+
+// one test to test multiple handlers
+func Test_application_userHandlers(t *testing.T) {
+	var tests = []struct {
+		name               string
+		method             string
+		json               string
+		paramID            string
+		handler            http.HandlerFunc
+		expectedStatusCode int
+	}{
+		{"allUsers", "GET", "", "", app.allUsers, http.StatusOK},
+		{"getUser valid", "GET", "", "1", app.getUser, http.StatusOK},
+		{"getUser invalid", "GET", "", "0", app.getUser, http.StatusBadRequest},
+		{"deleteUser", "DELETE", "", "1", app.deleteUser, http.StatusNoContent},
+
+		{
+			"updateUser valid",
+			"PATCH",
+			`{"id":1,"first_name":"administrator","last_name":"user", "email":"admin@example.com"}`,
+			"",
+			app.updateUser,
+			http.StatusNoContent,
+		},
+		{
+			"updateUser invalid",
+			"PATCH",
+			`{"id":2,"first_name":"administrator","last_name":"user", "email":"admin@example.com"}`,
+			"",
+			app.updateUser,
+			http.StatusBadRequest,
+		},
+		{
+			"updateUser invalid json",
+			"PATCH",
+			`{"id":1,first_name:"administrator","last_name":"user", "email":"admin@example.com"}`,
+			"",
+			app.updateUser,
+			http.StatusBadRequest,
+		},
+		{
+			"insertUser valid",
+			"PUT",
+			`{"first_name":"me","last_name":"who", "email":"me@example.com"}`,
+			"",
+			app.insertUser,
+			http.StatusNoContent,
+		},
+		{
+			"insertUser invalid",
+			"PUT",
+			`{"first_name":"me","foo":"bar","last_name":"who", "email":"me@example.com"}`,
+			"",
+			app.insertUser,
+			http.StatusBadRequest,
+		},
+		{
+			"insertUser bad json",
+			"PUT",
+			`{first_name:"me","last_name":"who", "email":"me@example.com"}`,
+			"",
+			app.insertUser,
+			http.StatusBadRequest,
+		},
+	}
+
+	for _, e := range tests {
+		var req *http.Request
+		if e.json == "" {
+			req, _ = http.NewRequest(e.method, "/", nil)
+		} else {
+			req, _ = http.NewRequest(e.method, "/", strings.NewReader(e.json))
+		}
+
+		if e.paramID != "" {
+			chiCtx := chi.NewRouteContext()
+			chiCtx.URLParams.Add("userID", e.paramID)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+		}
+
+		rr := httptest.NewRecorder()
+
+		handler := http.HandlerFunc(e.handler)
+
+		handler.ServeHTTP(rr, req)
+
+		if rr.Code != e.expectedStatusCode {
+			t.Errorf("%s: wrong status returned, expected %d, but got %d", e.name, e.expectedStatusCode, rr.Code)
+		}
+	}
 }
