@@ -49,6 +49,18 @@ func (app *application) authenticate(w http.ResponseWriter, r *http.Request) {
 		app.errorJSON(w, errors.New("unauthorized"), http.StatusUnauthorized)
 	}
 
+	http.SetCookie(w, &http.Cookie{
+		Name:     "__Host-refresh_token",
+		Path:     "/",
+		Value:    tokenPairs.RefreshToken,
+		Expires:  time.Now().Add(refreshTokenExpiry),
+		MaxAge:   int(refreshTokenExpiry.Seconds()),
+		SameSite: http.SameSiteStrictMode,
+		Domain:   "localhost", // not in prod, only for dev
+		HttpOnly: true,
+		Secure:   true,
+	})
+
 	// send token to user (JWT and refresh)
 	_ = app.writeJSON(w, http.StatusOK, tokenPairs)
 }
