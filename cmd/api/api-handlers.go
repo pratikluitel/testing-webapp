@@ -123,6 +123,67 @@ func (app *application) refresh(w http.ResponseWriter, r *http.Request) {
 	_ = app.writeJSON(w, http.StatusOK, tokenPairs)
 }
 
+func (app *application) refreshUsingCookie(w http.ResponseWriter, r *http.Request) {
+	for _, cookie := range r.Cookies() {
+		if cookie.Name == "__Host-refresh_token" {
+			claims := &Claims{}
+			refreshToken := cookie.Value
+
+			_, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+				return []byte(app.JWTSecret), nil
+			})
+
+			if err != nil {
+				app.errorJSON(w, err, http.StatusBadRequest)
+				return
+			}
+
+			// ignoring this in deve env for now
+			// if time.Unix(claims.ExpiresAt.Unix(), 0).Sub(time.Now()) > 30*time.Second {
+			// 	app.errorJSON(w, errors.New("refresh token does not need renew yet"), http.StatusTooEarly)
+			// 	return
+			// }
+
+			// get user id from claims
+			userID, err := strconv.Atoi(claims.Subject)
+			if err != nil {
+				app.errorJSON(w, err, http.StatusBadRequest)
+				return
+			}
+
+			user, err := app.DB.GetUser(userID)
+			if err != nil {
+				app.errorJSON(w, errors.New("unknown user"), http.StatusBadRequest)
+				return
+			}
+
+			tokenPairs, err := app.generateTokenPair(user)
+			if err != nil {
+				app.errorJSON(w, err, http.StatusBadRequest)
+				return
+			}
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     "__Host-refresh_token",
+				Path:     "/",
+				Value:    tokenPairs.RefreshToken,
+				Expires:  time.Now().Add(refreshTokenExpiry),
+				MaxAge:   int(refreshTokenExpiry.Seconds()),
+				SameSite: http.SameSiteStrictMode,
+				Domain:   "localhost", // not in prod, only for dev
+				HttpOnly: true,
+				Secure:   true,
+			})
+
+			// send back JSON
+			_ = app.writeJSON(w, http.StatusOK, tokenPairs)
+			return
+		}
+	}
+
+	app.errorJSON(w, errors.New("unauthorized"), http.StatusUnauthorized)
+}
+
 func (app *application) allUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := app.DB.AllUsers()
 	if err != nil {
@@ -197,4 +258,21 @@ func (app *application) insertUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (app *application) deleteRefreshCookie(w http.ResponseWriter, r *http.Request) {
+	delCookie := http.Cookie{
+		Name:     "__Host-refresh_token",
+		Path:     "/",
+		Value:    "",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		SameSite: http.SameSiteStrictMode,
+		Domain:   "localhost", // not in prod, only for dev
+		HttpOnly: true,
+		Secure:   true,
+	}
+
+	http.SetCookie(w, &delCookie)
+	w.WriteHeader(http.StatusAccepted)
 }
